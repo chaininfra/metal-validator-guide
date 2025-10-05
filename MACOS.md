@@ -12,6 +12,12 @@ Complete guide for running a Metal blockchain node on macOS (Intel or Apple Sili
 - **Storage**: 250 GB free disk space
 - **Network**: Sustained 5Mbps up/down bandwidth
 
+### Network Setup
+
+**If running from home**: You must configure port forwarding on your router. See [Port Forwarding Guide](#port-forwarding-for-home-networks) below.
+
+**If using a VPS**: Skip port forwarding - just configure firewall as shown in the main [README.md](README.md)
+
 ### Check Your System
 
 ```bash
@@ -21,6 +27,9 @@ sw_vers
 # Check architecture (Intel or Apple Silicon)
 uname -m
 # Returns: x86_64 (Intel) or arm64 (Apple Silicon)
+
+# Find your local IP (for port forwarding)
+ipconfig getifaddr en0
 ```
 
 ## Step 1: Install Homebrew
@@ -441,6 +450,258 @@ open http://localhost:9090/targets
 
 - [Metal Documentation](https://docs.metalblockchain.org/)
 - [GitHub Releases](https://github.com/MetalBlockchain/metalgo/releases)
+- [Discord Community](https://discord.gg/metalblockchain)
+
+## Port Forwarding for Home Networks
+
+If you're running your node from home (not a VPS/cloud), you **must** configure port forwarding on your router.
+
+### Required Ports
+
+Forward these ports from your router to your Mac's local IP:
+
+- **9651** (TCP) - Staking port (REQUIRED)
+- **9650** (TCP) - RPC port (optional, only if you need remote access)
+
+### Step-by-Step Guide
+
+#### Step 1: Find Your Mac's Local IP
+
+```bash
+# WiFi
+ipconfig getifaddr en0
+
+# Ethernet
+ipconfig getifaddr en1
+
+# Or use System Preferences
+# System Preferences → Network → Select connection → IP address shown
+```
+
+Note your local IP (e.g., `192.168.1.100`)
+
+#### Step 2: Find Your Router's IP
+
+```bash
+# Get default gateway (router IP)
+netstat -nr | grep default | awk '{print $2}' | head -1
+
+# Common router IPs:
+# 192.168.1.1
+# 192.168.0.1
+# 10.0.0.1
+# 192.168.100.1
+```
+
+#### Step 3: Access Your Router
+
+1. Open Safari (or any browser)
+2. Navigate to your router's IP (e.g., `http://192.168.1.1`)
+3. Login with your router credentials
+   - Check router label for default login
+   - Common: admin/admin, admin/password
+
+#### Step 4: Configure Port Forwarding
+
+**Location varies by router:**
+
+- **Apple AirPort**: AirPort Utility → Select base station → Edit → Network → Port Settings
+- **TP-Link**: Advanced → NAT Forwarding → Virtual Servers
+- **Netgear**: Advanced → Advanced Setup → Port Forwarding
+- **Linksys**: Security → Apps and Gaming → Single Port Forwarding
+- **Asus**: WAN → Virtual Server/Port Forwarding
+- **Google WiFi/Nest**: Google Home app → WiFi → Settings → Advanced → Port management
+- **Eero**: Eero app → Discover → Open a port or change NAT type
+
+#### Step 5: Add Port Forwarding Rules
+
+Create these rules:
+
+**Rule 1 - Staking Port (REQUIRED):**
+- Service Name: `Metal-Staking`
+- External Port: `9651`
+- Internal Port: `9651`
+- Internal IP: `YOUR_MAC_LOCAL_IP` (e.g., 192.168.1.100)
+- Protocol: `TCP`
+- Enable: `Yes`
+
+**Rule 2 - RPC Port (OPTIONAL):**
+- Service Name: `Metal-RPC`
+- External Port: `9650`
+- Internal Port: `9650`
+- Internal IP: `YOUR_MAC_LOCAL_IP`
+- Protocol: `TCP`
+- Enable: `Yes` (only if needed)
+
+#### Step 6: Prevent IP Changes (DHCP Reservation)
+
+Your Mac's local IP can change. Prevent this:
+
+**In Router:**
+1. Find DHCP or LAN settings
+2. Look for "DHCP Reservation" or "Static IP"
+3. Bind your Mac's MAC address to its IP
+
+**Find your Mac's MAC address:**
+```bash
+# WiFi
+ifconfig en0 | grep ether | awk '{print $2}'
+
+# Ethernet
+ifconfig en1 | grep ether | awk '{print $2}'
+
+# Or: System Preferences → Network → Advanced → Hardware → MAC Address
+```
+
+#### Step 7: Configure macOS Firewall
+
+```bash
+# Check if firewall is enabled
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate
+
+# If enabled, allow metalgo
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /usr/local/bin/metalgo
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /usr/local/bin/metalgo
+```
+
+**Or via GUI:**
+1. System Preferences → Security & Privacy → Firewall
+2. Click "Firewall Options"
+3. Click "+" and add `/usr/local/bin/metalgo`
+4. Set to "Allow incoming connections"
+
+### Verify Port Forwarding
+
+#### Test from External Tool
+
+Visit: https://www.yougetsignal.com/tools/open-ports/
+
+- Enter your public IP (get it from: https://ifconfig.me)
+- Test port: `9651`
+- Should show: "Port 9651 is open"
+
+#### Test with Command
+
+```bash
+# Install nmap via Homebrew
+brew install nmap
+
+# Get your public IP
+curl ifconfig.me
+
+# Test from outside (use online tool or different network)
+# Replace YOUR_PUBLIC_IP
+nmap -p 9651 YOUR_PUBLIC_IP
+```
+
+### Troubleshooting Port Forwarding
+
+**Port still shows closed:**
+
+1. **Check macOS Firewall:**
+   ```bash
+   sudo /usr/libexec/ApplicationFirewall/socketfilterfw --listapps | grep metalgo
+   ```
+
+2. **Verify local IP hasn't changed:**
+   ```bash
+   ipconfig getifaddr en0
+   ```
+   If changed, update router port forwarding rules
+
+3. **Check if node is listening:**
+   ```bash
+   lsof -i :9651
+   lsof -i :9650
+   ```
+
+4. **Test locally first:**
+   ```bash
+   nc -zv localhost 9651
+   ```
+
+5. **Check for VPN interference:**
+   - Disable VPN temporarily
+   - VPNs can block port forwarding
+
+6. **Router restart:**
+   - Unplug router for 30 seconds
+   - Plug back in and wait 2-3 minutes
+
+### Dynamic IP Considerations
+
+If your ISP gives you a dynamic public IP:
+
+**Option 1: Use Dynamic DNS**
+
+```bash
+# Install ddclient via Homebrew
+brew install ddclient
+
+# Or use a GUI app like:
+# - No-IP DUC
+# - DynDNS Updater
+```
+
+**Option 2: Check IP regularly**
+
+```bash
+# Create a script to check IP changes
+cat > ~/check-ip.sh << 'EOF'
+#!/bin/bash
+CURRENT_IP=$(curl -s ifconfig.me)
+STORED_IP=$(cat ~/.metal-ip 2>/dev/null)
+
+if [ "$CURRENT_IP" != "$STORED_IP" ]; then
+    echo "IP changed from $STORED_IP to $CURRENT_IP"
+    echo "$CURRENT_IP" > ~/.metal-ip
+    # Update your validator config here if needed
+fi
+EOF
+
+chmod +x ~/check-ip.sh
+
+# Run every hour via cron
+(crontab -l 2>/dev/null; echo "0 * * * * ~/check-ip.sh") | crontab -
+```
+
+**Option 3: Upgrade to Static IP**
+- Contact your ISP
+- Request a static IP (may cost extra)
+
+### Common Router-Specific Instructions
+
+**Comcast/Xfinity Gateway:**
+1. Visit: http://10.0.0.1
+2. Login → Advanced → Port Forwarding
+3. Enable bridge mode if using own router
+
+**AT&T Router:**
+1. Visit: http://192.168.1.254
+2. Firewall → NAT/Gaming
+3. Add custom service
+
+**Spectrum/Charter:**
+1. Visit: http://192.168.0.1 or http://192.168.1.1
+2. Advanced → Port Forwarding
+3. Create forwarding rules
+
+**Eero (via app):**
+1. Eero app → Discover
+2. Scroll to "Open a port or change NAT type"
+3. Add port forwarding rules
+
+### Security Notes
+
+- Only forward necessary ports (9651 is required, 9650 is optional)
+- Never forward SSH port (22) unless absolutely necessary
+- Keep router firmware updated
+- Use strong router admin password
+- Consider VPN for remote access instead of exposing RPC
+
+---
+
+**💡 Don't forget to vote for ChainInfra while staking XPR!**
 
 ---
 
