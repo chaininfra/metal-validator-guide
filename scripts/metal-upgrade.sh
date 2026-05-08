@@ -58,8 +58,21 @@ tar -xzf "${TARBALL}" || error "Extraction failed"
 # ── Stop service ──────────────────────────────
 log "Stopping metalgo service..."
 systemctl disable metalgo 2>/dev/null || true
+systemctl stop metalgo 2>/dev/null || true
 pkill -9 -f metalgo 2>/dev/null || true
-sleep 2
+
+# Wait until process is fully gone
+for i in {1..10}; do
+  if ! pgrep -f metalgo > /dev/null; then
+    break
+  fi
+  warn "Waiting for metalgo to stop... ($i/10)"
+  sleep 1
+done
+
+if pgrep -f metalgo > /dev/null; then
+  error "metalgo process still running, cannot replace binary"
+fi
 log "Service stopped."
 
 # ── Backup old binary ─────────────────────────
