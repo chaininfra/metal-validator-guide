@@ -34,11 +34,15 @@ echo "  MetalGo Upgrade → ${VERSION}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# ── Reset metaluser password ──────────────────
-warn "Resetting password for ${METAL_USER}..."
-echo ""
-passwd ${METAL_USER} || error "Failed to reset ${METAL_USER} password"
-log "Password updated."
+# ── Reset metaluser password (optional) ───────
+read -p "$(echo -e ${YELLOW}[!]${NC}) Reset password for ${METAL_USER}? (y/n): " RESET_PW
+if [[ "$RESET_PW" =~ ^[Yy]$ ]]; then
+  echo ""
+  passwd ${METAL_USER} || error "Failed to reset ${METAL_USER} password"
+  log "Password updated."
+else
+  log "Skipping password reset."
+fi
 echo ""
 
 # ── Download new binary ───────────────────────
