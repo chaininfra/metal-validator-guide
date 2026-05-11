@@ -7,7 +7,7 @@
 
 set -e
 
-VERSION="v1.12.2"
+VERSION="v1.13.5"
 BINARY_URL="https://github.com/MetalBlockchain/metalgo/releases/download/${VERSION}/metalgo-linux-amd64-${VERSION}.tar.gz"
 METAL_USER="metaluser"
 INSTALL_PATH="/home/${METAL_USER}/metal-node/metalgo"
